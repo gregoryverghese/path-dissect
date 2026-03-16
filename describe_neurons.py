@@ -11,9 +11,12 @@ import similarity
 
 parser = argparse.ArgumentParser(description='CLIP-Dissect')
 
-parser.add_argument("--clip_model", type=str, default="ViT-B/16", 
-                    choices=['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64', 'ViT-B/32', 'ViT-B/16', 'ViT-L/14'],
-                   help="Which CLIP-model to use")
+parser.add_argument("--clip_model", type=str, default="ViT-B/16",
+                    choices=['RN50', 'RN101', 'RN50x4', 'RN50x16', 'RN50x64',
+                             'ViT-B/32', 'ViT-B/16', 'ViT-L/14', 'plip', 'conch'],
+                    help="Which VLM to use for concept grounding")
+parser.add_argument("--conch_checkpoint", type=str, default=None,
+                    help="Path to CONCH model weights (required when --clip_model conch)")
 parser.add_argument("--target_model", type=str, default="resnet50", 
                    help=""""Which model to dissect, supported options are pretrained imagenet models from
                         torchvision and resnet18_places""")
@@ -39,11 +42,17 @@ if __name__ == '__main__':
     
     similarity_fn = eval("similarity.{}".format(args.similarity_fn))
     
-    utils.save_activations(clip_name = args.clip_model, target_name = args.target_model, 
-                           target_layers = args.target_layers, d_probe = args.d_probe, 
-                           concept_set = args.concept_set, batch_size = args.batch_size, 
-                           device = args.device, pool_mode=args.pool_mode, 
-                           save_dir = args.activation_dir)
+    vlm_kwargs = {}
+    if args.clip_model == "conch":
+        if args.conch_checkpoint is None:
+            raise ValueError("--conch_checkpoint is required when using --clip_model conch")
+        vlm_kwargs["conch_checkpoint"] = args.conch_checkpoint
+
+    utils.save_activations(clip_name=args.clip_model, target_name=args.target_model,
+                           target_layers=args.target_layers, d_probe=args.d_probe,
+                           concept_set=args.concept_set, batch_size=args.batch_size,
+                           device=args.device, pool_mode=args.pool_mode,
+                           save_dir=args.activation_dir, **vlm_kwargs)
     
     outputs = {"layer":[], "unit":[], "description":[], "similarity":[]}
     with open(args.concept_set, 'r') as f: 

@@ -2,10 +2,10 @@ import os
 import math
 import numpy as np
 import torch
-import clip
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 import data_utils
+from vlm_wrapper import load_vlm
 
 PM_SUFFIX = {"max":"_max", "avg":""}
 
@@ -96,13 +96,20 @@ def save_clip_image_features(model, dataset, save_name, batch_size=1000 , device
     return
 
 def save_clip_text_features(model, text, save_name, batch_size=1000):
+    """
+    model: VLMWrapper — encode_text accepts batches of whatever tokenize() returned.
+    text: output of model.tokenize() — either a tensor (CLIP) or a dict of tensors (PLIP/CONCH).
+    """
     if os.path.exists(save_name):
         return
     _make_save_dir(save_name)
+    n = text.shape[0] if isinstance(text, torch.Tensor) else len(next(iter(text.values())))
     text_features = []
     with torch.no_grad():
-        for i in tqdm(range(math.ceil(len(text)/batch_size))):
-            text_features.append(model.encode_text(text[batch_size*i:batch_size*(i+1)]))
+        for i in tqdm(range(math.ceil(n / batch_size))):
+            batch = (text[batch_size*i:batch_size*(i+1)] if isinstance(text, torch.Tensor)
+                     else {k: v[batch_size*i:batch_size*(i+1)] for k, v in text.items()})
+            text_features.append(model.encode_text(batch))
     text_features = torch.cat(text_features, dim=0)
     torch.save(text_features, save_name)
     del text_features
@@ -113,36 +120,38 @@ def get_clip_text_features(model, text, batch_size=1000):
     """
     gets text features without saving, useful with dynamic concept sets
     """
+    n = text.shape[0] if isinstance(text, torch.Tensor) else len(next(iter(text.values())))
     text_features = []
     with torch.no_grad():
-        for i in tqdm(range(math.ceil(len(text)/batch_size))):
-            text_features.append(model.encode_text(text[batch_size*i:batch_size*(i+1)]))
+        for i in tqdm(range(math.ceil(n / batch_size))):
+            batch = (text[batch_size*i:batch_size*(i+1)] if isinstance(text, torch.Tensor)
+                     else {k: v[batch_size*i:batch_size*(i+1)] for k, v in text.items()})
+            text_features.append(model.encode_text(batch))
     text_features = torch.cat(text_features, dim=0)
     return text_features
 
-def save_activations(clip_name, target_name, target_layers, d_probe, 
-                     concept_set, batch_size, device, pool_mode, save_dir):
-    
-    clip_model, clip_preprocess = clip.load(clip_name, device=device)
+def save_activations(clip_name, target_name, target_layers, d_probe,
+                     concept_set, batch_size, device, pool_mode, save_dir, **vlm_kwargs):
+
+    vlm = load_vlm(clip_name, device, **vlm_kwargs)
     target_model, target_preprocess = data_utils.get_target_model(target_name, device)
-    #setup data
-    data_c = data_utils.get_data(d_probe, clip_preprocess)
+    # setup data
+    data_c = data_utils.get_data(d_probe, vlm.preprocess)
     data_t = data_utils.get_data(d_probe, target_preprocess)
 
-    with open(concept_set, 'r') as f: 
+    with open(concept_set, 'r') as f:
         words = (f.read()).split('\n')
-    #ignore empty lines
-    words = [i for i in words if i!=""]
-    
-    text = clip.tokenize(["{}".format(word) for word in words]).to(device)
-    
-    save_names = get_save_names(clip_name = clip_name, target_name = target_name,
-                                target_layer = '{}', d_probe = d_probe, concept_set = concept_set,
-                                pool_mode=pool_mode, save_dir = save_dir)
+    words = [w for w in words if w != ""]
+
+    text = vlm.tokenize(words, device=device)
+
+    save_names = get_save_names(clip_name=clip_name, target_name=target_name,
+                                target_layer='{}', d_probe=d_probe, concept_set=concept_set,
+                                pool_mode=pool_mode, save_dir=save_dir)
     target_save_name, clip_save_name, text_save_name = save_names
-    
-    save_clip_text_features(clip_model, text, text_save_name, batch_size)
-    save_clip_image_features(clip_model, data_c, clip_save_name, batch_size, device)
+
+    save_clip_text_features(vlm, text, text_save_name, batch_size)
+    save_clip_image_features(vlm, data_c, clip_save_name, batch_size, device)
     save_target_activations(target_model, data_t, target_save_name, target_layers,
                             batch_size, device, pool_mode)
     return
@@ -172,21 +181,27 @@ def get_similarity_from_activations(target_save_name, clip_save_name, text_save_
         torch.cuda.empty_cache()
         return similarity
 
-def get_cos_similarity(preds, gt, clip_model, mpnet_model, device="cuda", batch_size=200):
+def get_cos_similarity(preds, gt, vlm, mpnet_model, device="cuda", batch_size=200):
     """
     preds: predicted concepts, list of strings
     gt: correct concepts, list of strings
+    vlm: VLMWrapper instance
     """
-    pred_tokens = clip.tokenize(preds).to(device)
-    gt_tokens = clip.tokenize(gt).to(device)
+    pred_tokens = vlm.tokenize(preds, device=device)
+    gt_tokens = vlm.tokenize(gt, device=device)
     pred_embeds = []
     gt_embeds = []
 
-    #print(preds)
+    n = (pred_tokens.shape[0] if isinstance(pred_tokens, torch.Tensor)
+         else len(next(iter(pred_tokens.values()))))
     with torch.no_grad():
-        for i in range(math.ceil(len(pred_tokens)/batch_size)):
-            pred_embeds.append(clip_model.encode_text(pred_tokens[batch_size*i:batch_size*(i+1)]))
-            gt_embeds.append(clip_model.encode_text(gt_tokens[batch_size*i:batch_size*(i+1)]))
+        for i in range(math.ceil(n / batch_size)):
+            def _batch(t, i):
+                if isinstance(t, torch.Tensor):
+                    return t[batch_size*i:batch_size*(i+1)]
+                return {k: v[batch_size*i:batch_size*(i+1)] for k, v in t.items()}
+            pred_embeds.append(vlm.encode_text(_batch(pred_tokens, i)))
+            gt_embeds.append(vlm.encode_text(_batch(gt_tokens, i)))
 
         pred_embeds = torch.cat(pred_embeds, dim=0)
         pred_embeds /= pred_embeds.norm(dim=-1, keepdim=True)
