@@ -73,7 +73,8 @@ class PLIPWrapper(VLMWrapper):
 
     def encode_image(self, images):
         # images: [B, C, H, W] float tensor, already preprocessed
-        feats = self.model.get_image_features(pixel_values=images)
+        vision_outputs = self.model.vision_model(pixel_values=images)
+        feats = self.model.visual_projection(vision_outputs.pooler_output)
         return F.normalize(feats, dim=-1)
 
     def encode_text(self, tokens):
