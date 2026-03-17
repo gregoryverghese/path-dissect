@@ -156,6 +156,42 @@ def save_activations(clip_name, target_name, target_layers, d_probe,
                             batch_size, device, pool_mode)
     return
     
+def save_cem_activations(model, dataset, save_name, device="cuda"):
+    """
+    Runs CEM on all slides and saves c_sem (concept state logits).
+    dataset: SlideEmbeddingDataset — yields (embeddings [n_tiles, h_dim], slide_id)
+    Saves [n_slides, n_concept_states] tensor.
+    """
+    if os.path.exists(save_name):
+        return
+    _make_save_dir(save_name)
+    all_c_sem = []
+    with torch.no_grad():
+        for emb, _ in tqdm(dataset, desc="CEM activations"):
+            x = emb.unsqueeze(0).to(device)   # [1, n_tiles, h_dim]
+            outputs = model(x)
+            c_sem = outputs[0]                 # [1, n_concept_states]
+            all_c_sem.append(c_sem.cpu())
+    torch.save(torch.cat(all_c_sem), save_name)  # [n_slides, n_concept_states]
+    torch.cuda.empty_cache()
+
+
+def save_plip_slide_features(plip_emb_dir, save_name, slide_ids):
+    """
+    Stacks pre-computed PLIP per-slide embeddings in slide_ids order.
+    slide_ids: list of slide ID strings (stems of .pt files in plip_emb_dir).
+    Saves [n_slides, 512] tensor.
+    """
+    if os.path.exists(save_name):
+        return
+    _make_save_dir(save_name)
+    embeddings = []
+    for sid in tqdm(slide_ids, desc="Loading PLIP embeddings"):
+        emb = torch.load(os.path.join(plip_emb_dir, f"{sid}.pt"), map_location="cpu")
+        embeddings.append(emb)
+    torch.save(torch.cat(embeddings), save_name)  # [n_slides, 512]
+
+
 def get_similarity_from_activations(target_save_name, clip_save_name, text_save_name, similarity_fn, 
                                    return_target_feats=True, device="cuda"):
     
