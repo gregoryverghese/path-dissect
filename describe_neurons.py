@@ -7,6 +7,7 @@ import torch
 
 import utils
 import similarity
+import data_utils
 
 
 parser = argparse.ArgumentParser(description='CLIP-Dissect')
@@ -48,37 +49,88 @@ if __name__ == '__main__':
             raise ValueError("--conch_checkpoint is required when using --clip_model conch")
         vlm_kwargs["conch_checkpoint"] = args.conch_checkpoint
 
-    utils.save_activations(clip_name=args.clip_model, target_name=args.target_model,
-                           target_layers=args.target_layers, d_probe=args.d_probe,
-                           concept_set=args.concept_set, batch_size=args.batch_size,
-                           device=args.device, pool_mode=args.pool_mode,
-                           save_dir=args.activation_dir, **vlm_kwargs)
-    
-    outputs = {"layer":[], "unit":[], "description":[], "similarity":[]}
-    with open(args.concept_set, 'r') as f: 
-        words = (f.read()).split('\n')
-    
-    for target_layer in args.target_layers:
-        save_names = utils.get_save_names(clip_name = args.clip_model, target_name = args.target_model,
-                                  target_layer = target_layer, d_probe = args.d_probe,
-                                  concept_set = args.concept_set, pool_mode = args.pool_mode,
-                                  save_dir = args.activation_dir)
-        target_save_name, clip_save_name, text_save_name = save_names
+    with open(args.concept_set, 'r') as f:
+        words = [w for w in (f.read()).split('\n') if w != ""]
+
+    # ------------------------------------------------------------------ #
+    # CEM pathway — slide-level MIL model                                 #
+    # ------------------------------------------------------------------ #
+    if args.target_model == "cem":
+        from vlm_wrapper import load_vlm
+
+        slide_dataset = data_utils.SlideEmbeddingDataset(data_utils.UNI_EMB_DIR)
+        slide_ids = slide_dataset.slide_ids
+
+        # Save names
+        concept_set_name = (args.concept_set.split("/")[-1]).split(".")[0]
+        target_save_name = f"{args.activation_dir}/cem_concept_bottleneck.pt"
+        clip_save_name   = f"{args.activation_dir}/tcga_plip_slides.pt"
+        text_save_name   = f"{args.activation_dir}/{concept_set_name}_plip.pt"
+
+        # CEM activations
+        cem_model = data_utils.get_cem_model(data_utils.CEM_CHECKPOINT, args.device)
+        utils.save_cem_activations(cem_model, slide_dataset, target_save_name, args.device)
+
+        # PLIP slide image embeddings
+        utils.save_plip_slide_features(data_utils.PLIP_EMB_DIR, clip_save_name, slide_ids)
+
+        # PLIP text embeddings
+        vlm = load_vlm("plip", args.device)
+        text_tokens = vlm.tokenize(words, device=args.device)
+        utils.save_clip_text_features(vlm, text_tokens, text_save_name, args.batch_size)
 
         similarities = utils.get_similarity_from_activations(
-            target_save_name, clip_save_name, text_save_name, similarity_fn, return_target_feats=False, device=args.device
+            target_save_name, clip_save_name, text_save_name,
+            similarity_fn, return_target_feats=False, device=args.device
         )
         vals, ids = torch.max(similarities, dim=1)
-        
         del similarities
         torch.cuda.empty_cache()
-        
+
         descriptions = [words[int(idx)] for idx in ids]
-        
-        outputs["unit"].extend([i for i in range(len(vals))])
-        outputs["layer"].extend([target_layer]*len(vals))
-        outputs["description"].extend(descriptions)
-        outputs["similarity"].extend(vals.cpu().numpy())
+        outputs = {
+            "layer": ["concept_bottleneck"] * len(vals),
+            "unit": list(range(len(vals))),
+            "description": descriptions,
+            "similarity": vals.cpu().numpy().tolist(),
+        }
+
+    # ------------------------------------------------------------------ #
+    # Standard pathway                                                     #
+    # ------------------------------------------------------------------ #
+    else:
+        vlm_kwargs = {}
+        if args.clip_model == "conch":
+            vlm_kwargs["conch_checkpoint"] = args.conch_checkpoint
+
+        utils.save_activations(clip_name=args.clip_model, target_name=args.target_model,
+                               target_layers=args.target_layers, d_probe=args.d_probe,
+                               concept_set=args.concept_set, batch_size=args.batch_size,
+                               device=args.device, pool_mode=args.pool_mode,
+                               save_dir=args.activation_dir, **vlm_kwargs)
+
+        outputs = {"layer": [], "unit": [], "description": [], "similarity": []}
+
+        for target_layer in args.target_layers:
+            save_names = utils.get_save_names(clip_name=args.clip_model, target_name=args.target_model,
+                                              target_layer=target_layer, d_probe=args.d_probe,
+                                              concept_set=args.concept_set, pool_mode=args.pool_mode,
+                                              save_dir=args.activation_dir)
+            target_save_name, clip_save_name, text_save_name = save_names
+
+            similarities = utils.get_similarity_from_activations(
+                target_save_name, clip_save_name, text_save_name,
+                similarity_fn, return_target_feats=False, device=args.device
+            )
+            vals, ids = torch.max(similarities, dim=1)
+            del similarities
+            torch.cuda.empty_cache()
+
+            descriptions = [words[int(idx)] for idx in ids]
+            outputs["unit"].extend(range(len(vals)))
+            outputs["layer"].extend([target_layer] * len(vals))
+            outputs["description"].extend(descriptions)
+            outputs["similarity"].extend(vals.cpu().numpy())
         
     df = pd.DataFrame(outputs)
     if not os.path.exists(args.result_dir):
