@@ -66,10 +66,10 @@ PYTHONPATH=. python scripts/plot_top_concepts.py \
 
 Concept sets are plain text files (one concept per line) in `concept_sets/`. They define the vocabulary of natural language descriptions matched to neurons.
 
-| File | Concepts | Description |
-|------|----------|-------------|
-| `pathology_concepts_combined.txt` | ~14,500 | Recommended — NCIt + HPO ontology terms, surgical/invasion concepts |
-| `pathology_focused.txt` | 1,895 | Curated subset filtered to TCGA-relevant cancer types |
-| `curated_concepts.txt` | 126 | Hand-curated, useful for quick tests |
+| File | Concepts | Source | Description |
+|------|----------|--------|-------------|
+| `pathology_concepts_combined.txt` | ~14,500 | NCIt, HPO, TCGA diagnostic reports, hand-curated | Recommended — broadest coverage |
+| `pathology_focused.txt` | 1,895 | NCIt, HPO | Filtered to TCGA-relevant cancer types; excludes haematological, CNS, sarcoma |
+| `curated_concepts.txt` | 126 | Hand-curated | Useful for quick tests; too small for production runs |
 
 Use sentence-style concepts (e.g. `invasive ductal carcinoma`, `nuclear pleomorphism`) rather than single keywords — both CONCH and PLIP were trained on captions.
