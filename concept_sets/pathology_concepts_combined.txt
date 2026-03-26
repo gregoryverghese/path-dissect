@@ -14465,3 +14465,77 @@ yolk sac tumor with somatic-type malignancy
 zollinger-ellison syndrome
 zonal necrosis
 zonal pattern
+lymphovascular invasion present
+lymphovascular invasion absent
+capsular perforation
+perineural invasion present
+perineural invasion absent
+deep tissue invasion
+muscularis propria invasion
+submucosal invasion
+serosal invasion
+fat invasion
+bone invasion
+skin invasion
+positive resection margin
+negative resection margin
+close surgical margin
+involved surgical margin
+clear resection margin
+lymph node metastasis present
+lymph node metastasis absent
+metastatic carcinoma in lymph node
+regional lymph node involvement
+extranodal tumor extension
+isolated tumor cells in lymph node
+micrometastasis in lymph node
+macrometastasis in lymph node
+sentinel lymph node positive
+sentinel lymph node negative
+visceral metastasis
+hepatic metastasis
+pulmonary metastasis
+bone metastasis
+brain metastasis
+well differentiated carcinoma
+moderately differentiated carcinoma
+high grade carcinoma
+low grade carcinoma
+intermediate grade carcinoma
+grade 1 carcinoma
+grade 2 carcinoma
+grade 3 carcinoma
+high nuclear grade
+low nuclear grade
+microinvasive carcinoma
+minimally invasive carcinoma
+superficially invasive carcinoma
+deeply invasive carcinoma
+high mitotic rate
+low mitotic rate
+increased mitotic figures
+atypical mitotic figures
+brisk mitotic activity
+high ki67 proliferation index
+low ki67 proliferation index
+extensive tumor necrosis
+focal tumor necrosis
+comedonecrosis
+small tumor
+large tumor
+bulky tumor
+tumor measuring less than 2 centimeters
+tumor measuring greater than 5 centimeters
+multifocal tumor
+bilateral tumor
+dense fibrotic stroma
+brisk tumor infiltrating lymphocytes
+sparse tumor infiltrating lymphocytes
+stromal inflammation
+peritumoral inflammation
+tumor thrombus
+vascular tumor thrombus
+glandular growth pattern
+expansile growth pattern
+pushing border
+infiltrating border
