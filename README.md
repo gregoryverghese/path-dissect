@@ -3,9 +3,9 @@
 ![Overview of the path-dissect technique](clip-dissect-fig.png)
 *Adapted from CLIP-Dissect*
 
-A fork of [CLIP-Dissect](https://github.com/Trustworthy-ML-Lab/CLIP-dissect) adapted for computational pathology. Replaces OpenAI CLIP with pathology-specific vision-language models (CONCH, PLIP) to automatically label neurons of a target pathology model using natural language concepts.
+A fork of [CLIP-Dissect](https://github.com/Trustworthy-ML-Lab/CLIP-dissect) adapted for biomedical models with a focus on computational pathology. Replaces OpenAI CLIP with multimodal biomedical or pathology-specific vision-language models (CONCH, PLIP) to automatically label neurons of a target pathology model using natural language concepts.
 
-The target model is a Concept Bottleneck Model (CEM) trained on TCGA survival prediction. Its concept bottleneck neurons are matched to pathology concepts by comparing their activation patterns across slides to VLM image-concept similarity scores.
+The target model is a Concept Bottleneck Model (CEM) trained on TCGA survival prediction. Its concept bottleneck neurons are matched to pathology concepts by comparing their activation patterns across slides to VLM image-concept similarity scores. Can be extended to other clinical AI and biomedical models. 
 
 ---
 
@@ -64,7 +64,7 @@ PYTHONPATH=. python scripts/plot_top_concepts.py \
 
 ## Concept sets
 
-Concept sets are plain text files (one concept per line) in `concept_sets/`. They define the vocabulary of natural language descriptions matched to neurons.
+Concept sets are plain text files (one concept per line) in `concept_sets/`. They define the vocabulary of natural language descriptions matched to neurons. TODO: Refinement of clinical and pathology specific concept sets.
 
 | File | Concepts | Description |
 |------|----------|-------------|
