@@ -75,19 +75,22 @@ if __name__ == '__main__':
 
         # Save names
         concept_set_name = (args.concept_set.split("/")[-1]).split(".")[0]
+        vlm_name = args.clip_model.replace("/", "")
         target_save_name = f"{args.activation_dir}/cem_concept_bottleneck.pt"
-        clip_save_name   = f"{args.activation_dir}/tcga_plip_slides.pt"
-        text_save_name   = f"{args.activation_dir}/{concept_set_name}_plip.pt"
+        clip_save_name   = f"{args.activation_dir}/tcga_{vlm_name}_slides.pt"
+        text_save_name   = f"{args.activation_dir}/{concept_set_name}_{vlm_name}.pt"
 
         # CEM activations
         cem_model = get_cem_model(CEM_CHECKPOINT, args.device)
         save_cem_activations(cem_model, slide_dataset, target_save_name, args.device)
 
-        # PLIP slide image embeddings
-        save_plip_slide_features(PLIP_EMB_DIR, clip_save_name, slide_ids)
+        # VLM slide image embeddings (pre-computed per-slide .pt files)
+        from path_dissect.datasets import CONCH_EMB_DIR
+        emb_dir = CONCH_EMB_DIR if args.clip_model == "conch" else PLIP_EMB_DIR
+        save_plip_slide_features(emb_dir, clip_save_name, slide_ids)
 
-        # PLIP text embeddings
-        vlm = load_vlm("plip", args.device)
+        # VLM text embeddings
+        vlm = load_vlm(args.clip_model, args.device, **vlm_kwargs)
         text_tokens = vlm.tokenize(words, device=args.device)
         save_clip_text_features(vlm, text_tokens, text_save_name, args.batch_size)
 
