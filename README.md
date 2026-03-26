@@ -69,7 +69,7 @@ Concept sets are plain text files (one concept per line) in `concept_sets/`. The
 | File | Concepts | Source | Description |
 |------|----------|--------|-------------|
 | `pathology_concepts_combined.txt` | ~14,500 | NCIt, HPO, TCGA diagnostic reports, hand-curated | Recommended — broadest coverage |
-| `pathology_focused.txt` | 1,895 | NCIt, HPO | Filtered to TCGA-relevant cancer types; excludes haematological, CNS, sarcoma |
+| `pathology_focused.txt` | 1,895 | NCIt, HPO, TCGA diagnostic reports | Filtered to TCGA-relevant cancer types; excludes haematological, CNS, sarcoma |
 | `curated_concepts.txt` | 126 | Hand-curated | Useful for quick tests; too small for production runs |
 
 Use sentence-style concepts (e.g. `invasive ductal carcinoma`, `nuclear pleomorphism`) rather than single keywords — both CONCH and PLIP were trained on captions.
