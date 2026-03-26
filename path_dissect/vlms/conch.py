@@ -29,8 +29,20 @@ class CONCHWrapper(VLMWrapper):
         return feats
 
     def tokenize(self, texts, device="cpu"):
-        from conch.open_clip_custom import tokenize as conch_tokenize
-        return conch_tokenize(self.tokenizer, texts).to(device)
+        import torch
+        import torch.nn.functional as F
+        # batch_encode_plus unavailable in newer tokenizers; use __call__ instead
+        tokens = self.tokenizer(
+            texts,
+            max_length=127,
+            add_special_tokens=True,
+            return_token_type_ids=False,
+            truncation=True,
+            padding="max_length",
+            return_tensors="pt",
+        )
+        ids = F.pad(tokens["input_ids"], (0, 1), value=self.tokenizer.pad_token_id)
+        return ids.to(device)
 
     @property
     def preprocess(self):

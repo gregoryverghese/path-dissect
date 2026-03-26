@@ -22,7 +22,8 @@ class PLIPWrapper(VLMWrapper):
 
     def encode_text(self, tokens):
         # tokens: dict of tensors from tokenize()
-        feats = self.model.get_text_features(**tokens)
+        text_outputs = self.model.text_model(**tokens)
+        feats = self.model.text_projection(text_outputs.pooler_output)
         return F.normalize(feats, dim=-1)
 
     def tokenize(self, texts, device="cpu"):
