@@ -129,6 +129,7 @@ results/
 *.zip
 
 # Project-specific: data files (not versioned)
+CLAUDE.md
 data/broden1_224
 data/resnet18_places365.pth.tar
 concept_sets/*.txt
