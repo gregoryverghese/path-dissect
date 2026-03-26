@@ -3,9 +3,12 @@ path_dissect.datasets.tcga — TCGA-specific datasets, constants, and helpers.
 
 Contents
 --------
+SlideTileDataset       — loads tiles from a single slide directory for embedding generation
 SlideEmbeddingDataset  — loads pre-computed per-slide UNI embeddings for CEM input
 UNI_EMB_DIR            — default directory for UNI embeddings
 PLIP_EMB_DIR           — default directory for PLIP embeddings
+CONCH_EMB_DIR          — default directory for CONCH embeddings
+CLIP_EMB_DIR           — default directory for CLIP embeddings
 CEM_CHECKPOINT         — path to trained CEM checkpoint
 CEM_HPARAMS            — hyperparameters matching the checkpoint state dict
 get_cem_model()        — load ConceptEmbeddingModel from a Lightning checkpoint
@@ -15,6 +18,7 @@ import os
 import sys
 import torch
 from pathlib import Path
+from PIL import Image
 from torch.utils.data import Dataset
 
 
@@ -22,9 +26,11 @@ from torch.utils.data import Dataset
 # Path constants
 # ---------------------------------------------------------------------------
 
-UNI_EMB_DIR  = "/home/maracuja/data/tcga/uni_embeddings"
-PLIP_EMB_DIR = "/home/maracuja/data/tcga/plip_embeddings"
-CEM_CHECKPOINT = "/home/maracuja/projects/conch-dissect/model.ckpt"
+UNI_EMB_DIR    = "/home/maracuja/data/tcga/uni_embeddings"
+PLIP_EMB_DIR   = "/home/maracuja/data/tcga/plip_embeddings"
+CONCH_EMB_DIR  = "/home/maracuja/data/tcga/conch_embeddings"
+CLIP_EMB_DIR   = "/home/maracuja/data/tcga/clip_embeddings"
+CEM_CHECKPOINT = "/home/maracuja/projects/path-dissect/model.ckpt"
 
 # Inferred from checkpoint state dict
 CEM_HPARAMS = dict(
@@ -48,6 +54,27 @@ CEM_HPARAMS = dict(
 # ---------------------------------------------------------------------------
 
 TCGA_TILE_DIR = "/home/maracuja/data/tcga/tiles/"
+
+
+# ---------------------------------------------------------------------------
+# Tile dataset (used by embedding generation scripts)
+# ---------------------------------------------------------------------------
+
+class SlideTileDataset(Dataset):
+    """
+    Loads all PNG tiles from a single slide directory, applying a transform.
+    Tiles are returned in sorted filename order to ensure alignment across VLMs.
+    """
+    def __init__(self, tile_dir: Path, transform):
+        self.tile_paths = sorted(tile_dir.glob("*.png"))
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.tile_paths)
+
+    def __getitem__(self, idx):
+        img = Image.open(self.tile_paths[idx]).convert("RGB")
+        return self.transform(img)
 
 
 # ---------------------------------------------------------------------------
@@ -75,6 +102,13 @@ class SlideEmbeddingDataset(Dataset):
 # CEM model loader
 # ---------------------------------------------------------------------------
 
+class _DummyHook:
+    """Dummy attention hook — satisfies the architecture init without recording anything."""
+    @staticmethod
+    def hook_fn(model, input, output):
+        pass
+
+
 def get_cem_model(checkpoint_path=CEM_CHECKPOINT, device="cuda"):
     """
     Load ConceptEmbeddingModel from a Lightning checkpoint.
@@ -82,7 +116,7 @@ def get_cem_model(checkpoint_path=CEM_CHECKPOINT, device="cuda"):
     """
     from ..probe_models.ccem.cem_mil import ConceptEmbeddingModel  # noqa: E402
 
-    model = ConceptEmbeddingModel(**CEM_HPARAMS)
+    model = ConceptEmbeddingModel(**CEM_HPARAMS, attention_hook=_DummyHook())
     ck = torch.load(checkpoint_path, map_location="cpu")
     model.load_state_dict(ck["state_dict"])
     model.eval().to(device)
